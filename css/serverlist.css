@@ -1,0 +1,259 @@
+body {
+    background: radial-gradient(50% 50% at 50% 50%, #1a3648 0%, #182535 100%);
+}
+.date {
+    color:#5cc0d8;
+    text-align:center;
+}
+.date .time {
+    color:yellow;
+}
+.summary {
+    width:500px;
+    margin:0 auto 20px auto;
+    color:darkgrey;
+    text-align:right;
+}
+#jamhostCt {
+    color:red;
+}
+#serversOn {
+    color:lightgreen;
+    font-weight:bold;
+    padding-right:60px;
+}
+#playersOn {
+    color:lightgreen;
+    font-weight:bold;
+    padding-right:30px;
+}
+.tips {
+    width:480px;
+    margin:auto;
+}
+.tips_head {
+    color:#666666;
+    text-align:right;
+    padding-top:10px;
+    padding-right:22px;
+    margin-bottom:10px;
+    position:relative;
+}
+.tips_head_wd {
+    border-bottom:2px dashed #666666;
+}
+.tips_hint {
+    font-size:12px;
+    color:lightgrey;
+    border:5px solid grey;
+    background-color:rgba(22,33,33,0.87);
+    display:none;
+    width:300px;
+    position:absolute;
+    top:90px;
+    z-index:2;
+}
+.tips_hint li {
+    padding:5px;
+}
+.tips:hover .tips_hint {
+    display:inline-block;
+}
+.tips:hover .tips_head {
+    color:#22ccaa;
+}
+.blockred {
+    margin:0px 5px;
+    padding:0px 10px;
+    background-color:darkred;
+}
+.blockgreen {
+    margin:0px 5px;
+    padding:0px 10px;
+}
+#dblclickInfo {
+    position:fixed;
+    top:0;
+    left:0;
+    color:lightblue;
+    font-size:15px;
+    font-weight:600;
+    animation:usrblink 1.6s linear 0s infinite alternate;
+}
+@keyframes usrblink {
+    0%{
+	opacity:.86;
+    }
+    50%{
+	opacity:.86;
+    }
+    64%{
+	opacity:0;
+    }
+    100%{
+        opacity:0;
+    }
+}
+.nicehost .blockgreen {
+    background-color:#80bb80;
+}
+.spechost .blockgreen {
+    background-color:#bb7744;
+}
+.fullhost .blockgreen {
+    background-color:#af4466;
+}
+.emptyhost .blockgreen {
+    background-color:#808080;
+}
+.headrow {
+    height:30px;
+    font-weight:bold;
+    font-size:14px;
+}
+.map {
+    padding:0 20px 0 32px;
+}
+.tickrate {
+    color:lightgreen;
+}
+.emptyhost {
+    color:#888888;
+}
+.jamhost {
+    color:#888888;
+}
+.jamhost:hover {
+    color:#aa5555;
+}
+.hostinfo {
+    position:relative;
+}
+.playername {
+    padding:0 20px 0 32px;
+    word-break:break-all;
+}
+.playerinfo {
+    font-size:12px;
+}
+.playerinfo:hover {
+    color:white;
+    background-color:#181818;
+}
+.playertable {
+    display: none;
+    position:absolute;
+    top:16px;
+    left:42px;
+    background-color: #121212;
+    background-clip: padding-box;
+    border-radius:24px;
+    border:10px solid transparent;
+    width:470px;
+    padding-bottom:10px;
+    z-index:2;
+    opacity: 0.9;
+}
+.serverinfo {
+    position: relative;
+    width:500px;
+    margin: auto;
+}
+.serverinfo:hover .playertable {
+    display:table-row;
+    animation: 0.25s ease-in 0s show;
+}
+@keyframes show {
+    from{opacity: 0.1;}
+    to{opacity: 0.9;}
+}
+#title {
+    color:#c5c3c0;
+    text-align:center;
+}
+table {
+    margin:auto;
+    color:#cacaca;
+    border:0;
+    border-spacing:0;
+    width:500px;
+}
+.playertable tr td:nth-child(1) {
+    width:260px;
+    box-sizing: border-box;
+}
+.playertable tr td:nth-child(2) {
+    width:160px;
+    padding-right:20px;
+    box-sizing: border-box;
+}
+.playertable tr td:nth-child(3) {
+    width:50px;
+    box-sizing: border-box;
+}
+.serverinfo:hover .hostinfo {
+    background-color:rgba(256,256,256,.1);
+    color:white;
+}
+.serverinfo:hover .nicehost .blockgreen {
+    background-color:#90ee90;
+}
+.serverinfo:hover .spechost .blockgreen {
+    background-color:#dd6622;
+}
+.serverinfo:hover .fullhost .blockgreen {
+    background-color:#dd2060;
+}
+.serverinfo:hover .emptyhost .blockgreen {
+    background-color:#c1c1c1;
+}
+.serverinfo:hover .spechost .slotingame {
+    color:#dd6622;
+}
+.serverinfo:hover .fullhost .slotingame {
+    color:#dd2060;
+}
+.serverinfo:hover .emptyhost {
+    color:white;
+}
+.footer {
+    width:100%;
+    color:white;
+    background-color:#1f1f1f;
+}
+.footer pre {
+    width:500px;
+    margin:auto;
+}
+a:link {
+    color:#aacc22;
+}
+a:visited {
+    color:#aacc22;
+}
+a:hover {
+    color:#22ccaa;
+}
+a:active {
+    color:#22ccaa;
+}
+.joingame {
+    text-decoration:none;
+    font-weight:bold;
+}
+.location {
+    width:100%;
+    text-align:right;
+    padding-right:24px;
+    font-size:12px;
+    color:grey;
+}
+.hostname {
+    width:220px;
+}
+.hostname:hover {
+    cursor:cell;
+}
+.slotinfo {
+    width:60px;
+}
