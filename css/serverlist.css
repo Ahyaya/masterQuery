@@ -114,8 +114,11 @@ body {
 .map {
     padding:0 20px 0 32px;
 }
-.tickrate {
+.hiddenFlag_0 {
     color:lightgreen;
+}
+.hiddenFlag_1 {
+    color:#aa5555;
 }
 .emptyhost {
     color:#888888;
