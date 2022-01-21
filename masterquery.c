@@ -41,17 +41,21 @@
 
 struct valveServInfo
 {
-    char ipv4[16];
+    char ipv4[32];
     int port;
     int status;
+    int hidden;
     char hostname[64];
     char map[32];
     int players;
     int slots;
-    int ticks;
-    char playername[8][32];
-    int playerscore[8];
-    double duration[8];
+    char playername[16][32];
+    int playerscore[16];
+    double duration[16];
+};
+
+struct deceitIp {
+    char ipv4[25];
 };
 
 struct valveServList
@@ -61,6 +65,7 @@ struct valveServList
     int allplayers;
     int index[MAXSERVER];
     struct valveServInfo server[MAXSERVER];
+    struct deceitIp dctIp[MAXSERVER];
 };
 
 /*global var declear*/
@@ -80,6 +85,7 @@ struct masterqueryGlobalVar_t
     int opt_web;
     int opt_footer; 
     int opt_header;
+    int opt_deceit;
 } masterGlobalVar;
 
 /*function declear*/
@@ -107,7 +113,8 @@ int updateStatusJS(FILE *fp, struct valveServList *pservList);
 
 int version_print(char *pName);
 int usage_print(char *pName);
-
+int initDctList(struct valveServList *pservList);
+int loadDctList(struct valveServList *pservList, char dctPath[]);
 /*
 *   end of declear part
 */
@@ -121,14 +128,17 @@ int usage_print(char *pName);
 */
 
 int sscanIp2srvInfo(char *addrport, struct valveServInfo *pserver) {
-    char *server_IP, *getport, *gettick, *input_option=strdup(addrport);
-    server_IP = strsep(&input_option,":");
-    getport = strsep(&input_option,"T");
-    gettick = strsep(&input_option,"@");
-    free(input_option);
+    char *server_IP, *getport, *input_option, buff_option[128];
+    strcpy(buff_option,addrport); input_option=buff_option;
+    int pf=0;
+    pserver[0].hidden=(input_option[strlen(input_option)-1]=='H')?1:0;
+    server_IP = strsep(&input_option,":TH");
+    getport = strsep(&input_option,":TH");
+
     sprintf(pserver[0].ipv4,"%s",server_IP);
+
     pserver[0].port=(getport==NULL)?27015:atoi(getport);
-    pserver[0].ticks=(gettick==NULL)?100:atoi(gettick);
+    
     return 0;
 }
 
@@ -150,6 +160,32 @@ int fscanIp2srvList(FILE *fp, struct valveServList *pservList) {
     for(pf=0;pf<length;pf++){
         pservList[0].index[pf]=pf;
     }
+    return 0;
+}
+
+int initDctList(struct valveServList *pservList){
+    int ptr, seg_0, seg_1;
+    for(ptr=0, seg_0=1, seg_1=1;ptr<MAXSERVER;++ptr,++seg_0){
+        if(seg_0>255){
+            ++seg_1;
+            seg_0=1;
+        }
+        sprintf(pservList->dctIp[ptr].ipv4,"192.168.%d.%d",seg_1,seg_0);
+    }
+    return 0;
+}
+
+int loadDctList(struct valveServList *pservList, char dctPath[]){
+    FILE *fp=fopen(dctPath,"r");
+    if(fp==NULL) return -1;
+    int ptr, lptr, tptr;
+    for(ptr=0;fscanf(fp,"%s",pservList->dctIp[ptr].ipv4)>0 && ptr<MAXSERVER;++ptr);
+    tptr=ptr-1;
+    for(lptr=0;ptr<MAXSERVER;++ptr,++lptr){
+        lptr=lptr>tptr?0:lptr;
+        strcpy(pservList->dctIp[ptr].ipv4,pservList->dctIp[lptr].ipv4);
+    }
+    fclose(fp);
     return 0;
 }
 
@@ -194,6 +230,7 @@ int A2S_INFO (struct valveServInfo *pserver) {
     bzero(&serverSock, sizeof(serverSock));
     serverSock.sin_family = AF_INET;
     serverSock.sin_port = htons(pserver[0].port);
+    DNSquery(pserver[0].ipv4);
     if((serverSock.sin_addr.s_addr = inet_addr(pserver[0].ipv4))==-1)
     {
         if(DNSquery(pserver[0].ipv4)==-1){
@@ -312,7 +349,7 @@ int A2S_INFO (struct valveServInfo *pserver) {
             p_time[0]=buf[pf];p_time[1]=buf[pf+1];p_time[2]=buf[pf+2];p_time[3]=buf[pf+3];
 			pserver[0].duration[pt]=time_sec;
             pf+=4;nameLen=0;pt++;
-			if(pt>7) break;
+			if(pt>15) break;
         }
     }
 	pserver[0].status=0;
@@ -396,15 +433,14 @@ int fprint_console(struct valveServList *pservList) {
         if(pservList[0].server[index[pf]].status)
         {
             if(masterGlobalVar.opt_logon){
-                fprintf(stderr, "%s:%d timeout!\n", pservList[0].server[index[pf]].ipv4, pservList[0].server[index[pf]].port);
+                fprintf(stderr, "%s:%d\n", pservList[0].server[index[pf]].ipv4, pservList[0].server[index[pf]].port);
             }
             continue;
         }
 
     //basic info
-        fprintf(stdout, "%s @ %dfps\n%s:%d\t%s\t%d/%d\n",
+        fprintf(stdout, "%s\n%s:%d\t%s\t%d/%d\n",
         pservList[0].server[index[pf]].hostname,
-        pservList[0].server[index[pf]].ticks,  
         pservList[0].server[index[pf]].ipv4, 
         pservList[0].server[index[pf]].port, 
         pservList[0].server[index[pf]].map,
@@ -440,18 +476,31 @@ int fprintHTML_content(FILE *fp, struct valveServList *pservList) {
     const int survive=pservList[0].survive;
     const int *index=pservList[0].index;
     double duration;
+    char ipv4Show[64];
+    char *hiddenFlag[]={"visible","hidden"};
+    int hidden;
+    if(!masterGlobalVar.opt_deceit){
+        fprintf(stdout,"\033[33m setting up default deceit Ip\033[0m\n\n");
+        initDctList(pservList);
+    }
 
     for (pf=indexLen-1;pf>-1;pf--){
         players=pservList[0].server[index[pf]].players;
-        players=players<8?players:8;
+        players=players<16?players:16;
         players=players>0?players:0;
+        hidden=pservList[0].server[index[pf]].hidden;
 
         if(pservList[0].server[index[pf]].status)
         {
             if(masterGlobalVar.opt_logon){
-                fprintf(stderr, "%s:%d timeout!\n", pservList[0].server[index[pf]].ipv4, pservList[0].server[index[pf]].port);
+                fprintf(stderr, "%s:%d\n", pservList[0].server[index[pf]].ipv4, pservList[0].server[index[pf]].port);
             }
             continue;
+        }
+        if(hidden){
+            strcpy(ipv4Show,pservList[0].dctIp[index[pf]].ipv4);
+        }else{
+            strcpy(ipv4Show,pservList[0].server[index[pf]].ipv4);
         }
 
     //cache server basic info html (basic info table)
@@ -471,13 +520,13 @@ int fprintHTML_content(FILE *fp, struct valveServList *pservList) {
 	    }
 
         /*insert double click javascript*/
-        fprintf(fp, "<td colspan=\"2\" class=\"hostname\" ondblclick=\"cpIp2Clip(\'%s:%d\');\"><span class=\"blockgreen\"></span>%s</td><td class=\"slotinfo\"><span class=\"slotingame\">%d</span>/%d</td></tr>\n",pservList[0].server[index[pf]].ipv4,pservList[0].server[index[pf]].port,pservList[0].server[index[pf]].hostname,pservList[0].server[index[pf]].players,pservList[0].server[index[pf]].slots);
+        fprintf(fp, "<td colspan=\"2\" class=\"hostname\" ondblclick=\"cpIp2Clip(\'%s:%d\');\"><span class=\"blockgreen\"></span>%s</td><td class=\"slotinfo\"><span class=\"slotingame\">%d</span>/%d</td></tr>\n",ipv4Show,pservList[0].server[index[pf]].port,pservList[0].server[index[pf]].hostname,pservList[0].server[index[pf]].players,pservList[0].server[index[pf]].slots);
 	    fprintf(fp, "</tbody></table>\n");
     /*end of basic info table*/
 
-    /*cache map tickrate info html (detail info table)*/
+    /*cache map info html (detail info table)*/
 	    fprintf(fp, "<table class=\"playertable\"><tbody>\n");
-        fprintf(fp, "<tr class=\"headrow\"><td class=\"map\">%s</td><td class=\"tickrate\">%dfps</td><td><a href=\"steam://connect/%s:%d\" target=\"_blank\" class=\"joingame\">Join</a></td></tr>\n",pservList[0].server[index[pf]].map,pservList[0].server[index[pf]].ticks,pservList[0].server[index[pf]].ipv4,pservList[0].server[index[pf]].port);
+        fprintf(fp, "<tr class=\"headrow\"><td class=\"map\">%s</td><td class=\"hiddenFlag_%d\">%s</td><td><a href=\"steam://connect/%s:%d\" target=\"_blank\" class=\"joingame\" name=\"hiddenFlag_%d\">Join</a></td></tr>\n",pservList[0].server[index[pf]].map,hidden,hiddenFlag[hidden],ipv4Show,pservList[0].server[index[pf]].port,hidden);
 
         /*cache player info*/
         for(p=0;p<players;p++){
@@ -502,8 +551,12 @@ int fprintHTML_content(FILE *fp, struct valveServList *pservList) {
 
     /*Insert javascript to get ip location, the script will call a js function that changes the html content*/
     fprintf(fp, "<script>\n");
-    for(cnt=0,pf=indexLen; cnt<survive; pf--,cnt++){
-        fprintf(fp, "labelIp(\'AS%d\',\'%s\');\n",index[pf-1],pservList[0].server[index[pf-1]].ipv4);
+    for(cnt=0,pf=indexLen-1; cnt<survive; pf--,cnt++){
+        if(pservList[0].server[index[pf]].hidden){
+            fprintf(fp, "labelIp(\'AS%d\',\'%s\');\n",index[pf],pservList[0].dctIp[index[pf]].ipv4);
+        }else{
+            fprintf(fp, "labelIp(\'AS%d\',\'%s\');\n",index[pf],pservList[0].server[index[pf]].ipv4);
+        }
 	}
 	fprintf(fp, "\n</script>\n");
 
@@ -535,6 +588,7 @@ int fprintHTML_header_default(FILE *fp) {
 int fprintHTML_footer_default(FILE *fp) {
 	fprintf(fp,"<br />\n<div class=\"footer\"><pre>This L4D2 CO-OP plugin is developed by <b>Anne</b>.\nUnzip the <a href=\"https://github.com/Caibiii/AnneServer/\">AnneHappy plugin</a> to your dedicated server and join us!\nThank <b>HoongDou</b> for updating the script and <a href=\"https://www.hoongdou.com/index.php/2021/05/22/anne/\">README</a>.</pre></div>\n");
     fprintf(fp,"\n<script src=\"js/status.js\"></script>\n");
+    fprintf(fp,"\n<script src=\"js/deceit.js\"></script>\n");
     fprintf(fp,"\n</body>\n</html>\n");
 	return 0;
 }
@@ -599,28 +653,30 @@ int arcSimSort(int head, int tail, int* index, int* data) {
     return 0;
 }
 
-int arcPivotSort(int head, int tail, int* index, int* data) {
+int arcPivotSort(int head, int tail, int* index, int* data)
+{
     int pivot, swap;
     int phead=head, ptail=tail;
     int dhead=data[index[phead]], dmidd=data[index[(phead+ptail)/2]], dtail=data[index[ptail]];
     pivot=((dhead-dmidd)*(dmidd-dtail)>0)?dmidd:((dmidd-dhead)*(dhead-dtail)>0?dhead:dtail);
     while(phead<ptail)
     {
-        while(data[index[ptail]]>=pivot && ptail>phead){ptail--;}
-        while(data[index[phead]]<=pivot && phead<ptail){phead++;}
+        while(data[index[ptail]]>pivot && ptail>phead){ptail--;}
+        while(data[index[phead]]<pivot && phead<ptail){phead++;}
         swap=index[phead];index[phead]=index[ptail];index[ptail]=swap;
     }
     return phead;
 }
 
-int arcQuickSort(int head, int tail, int* index, int* data) {
+int arcQuickSort(int head, int tail, int* index, int* data)
+{
     int pivot;
     if(tail<8+head){
 	    arcSimSort(head,tail,index,data);
 	    return 0;
     }
     pivot=arcPivotSort(head, tail, index, data);
-    arcQuickSort(head, pivot, index, data);
+    arcQuickSort(head, pivot-1, index, data);
     arcQuickSort(pivot+1, tail, index, data);
 }
 
@@ -636,6 +692,7 @@ int usage_print(char *pName){
     fprintf(stdout,"\nshow this page\n  --help or -h\n");
     fprintf(stdout,"\nshow version only:\n  --version or -v\n");
     fprintf(stdout,"\nuse html page to display:\n  --web servers.html\n");
+    fprintf(stdout,"\nuse external IP cover\n  --deceit servercover\n");
     fprintf(stdout,"\nturn on error log: (output as stderr)\n  --log-on or -l\n");
     fprintf(stdout,"\nshow even more detail when querying: (verbose mode)\n --verbose or -V\n");
     fprintf(stdout,"\ndefine your own HTML header and footer:\n  --header xxx.html --footer yyy.html\n");
@@ -663,6 +720,7 @@ int main(int argc, char * argv[])
 		{"log-on", 0, NULL, 'l'},
         {"footer", 1, NULL, 'F'},
         {"header", 1, NULL, 'H'},
+        {"deceit", 1, NULL, 'd'},
 		{"NULL", 0, NULL, 0}
 	};
 
@@ -679,8 +737,9 @@ int main(int argc, char * argv[])
     masterGlobalVar.opt_footer=0;
     masterGlobalVar.opt_header=0;
     masterGlobalVar.opt_logon=0;
+    masterGlobalVar.opt_deceit=0;
 
-    while(!((Copt = getopt_long(argc, argv, "hvVlt:w:F:H:", long_option, NULL)) < 0)) {
+    while(!((Copt = getopt_long(argc, argv, "hvVlt:w:F:H:d:", long_option, NULL)) < 0)) {
         switch(Copt){
 	        case 'h':
 		        usage_print(argv[0]);
@@ -716,6 +775,10 @@ int main(int argc, char * argv[])
                 while(optarg[pf]!=0){footerPath[pf]=optarg[pf];pf++;}
                 footerPath[pf]=0; pf=0;
                 break;
+            case 'd':
+                masterGlobalVar.opt_deceit=1;
+                loadDctList(&mylist,optarg);
+                break;
         }
     }
     if(optind==argc) {
@@ -748,10 +811,10 @@ int main(int argc, char * argv[])
     for(pf=0;pf<mylist.length;pf++){
         players=mylist.server[pf].players;
         openslots=mylist.server[pf].slots-players; openslots=openslots>0?openslots:0; openslots=openslots<10?openslots:10;
-        pv=players>0?(players<4?(700+64*players):(64*openslots+64)):0;
-        pv=openslots>0?pv:64;
+        pv=players>0?(players<4?(2048+128*players):(128*openslots+128)):0;
+        pv=openslots>0?pv:128;
         /*your own rule designed for sort*/
-        myrule[pf]=pf+pv+999*mylist.server[pf].status;
+        myrule[pf]=pf+pv+4096*mylist.server[pf].status;
     }
 
 /*
