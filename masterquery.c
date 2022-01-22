@@ -100,6 +100,7 @@ void * query_thread();
 int queryList_mt(struct valveServList *pservList, int thread_n);
 
 int arcSimSort(int head, int tail, int* index, int* data);
+int arcBinSort(int head, int tail, int index[], int data[]);
 int arcPivotSort(int head, int tail, int* index, int* data);
 int arcQuickSort(int head, int tail, int* index, int* data);
 
@@ -650,6 +651,19 @@ int arcSimSort(int head, int tail, int* index, int* data)
     return 0;
 }
 
+int arcBinSort(int head, int tail, int index[], int data[]){
+    int sorted, swap, clip;
+    for(sorted=head;sorted<tail&&data[index[sorted+1]]>=data[index[sorted]];++sorted);
+    for(;sorted<tail;++sorted){
+        for(clip=sorted+1;clip>head;--clip){
+            if(data[index[clip-1]]>data[index[clip]]){
+                swap=index[clip-1];index[clip-1]=index[clip];index[clip]=swap;
+            }
+        }
+    }
+    return 0;
+}
+
 int arcPivotSort(int head, int tail, int* index, int* data)
 {
     int pivot, swap, ptr;
@@ -686,7 +700,8 @@ int arcQuickSort(int head, int tail, int* index, int* data)
     if(head>=tail){
         return 0;
     }else if(tail<32+head){
-	    arcSimSort(head,tail,index,data);
+	    //arcSimSort(head,tail,index,data);
+        arcBinSort(head,tail,index,data);
 	    return 0;
     }
     pivot=arcPivotSort(head, tail, index, data);
