@@ -636,34 +636,46 @@ int updateStatusJS(FILE *fp, struct valveServList *pservList) {
     return 0;
 }
 
-int arcSimSort(int head, int tail, int* index, int* data) {    
+int arcSimSort(int head, int tail, int* index, int* data)
+{    
     int pf, spf=0, unsort, swap;
-    for(unsort=head;unsort<tail+1;unsort++)
+    for(unsort=head;unsort<=tail;++unsort)
     {
-    	pf=unsort;spf=unsort;
-    	while(pf<tail+1)
+    	for(pf=unsort,spf=unsort;pf<=tail;++pf)
     	{
     		spf=data[index[pf]]<data[index[spf]]?pf:spf;
-    		pf++;
     	}
-    	swap=index[spf];
-    	index[spf]=index[unsort];
-    	index[unsort]=swap;
+    	swap=index[spf];index[spf]=index[unsort];index[unsort]=swap;
     }
     return 0;
 }
 
 int arcPivotSort(int head, int tail, int* index, int* data)
 {
-    int pivot, swap;
+    int pivot, swap, ptr;
     int phead=head, ptail=tail;
     int dhead=data[index[phead]], dmidd=data[index[(phead+ptail)/2]], dtail=data[index[ptail]];
     pivot=((dhead-dmidd)*(dmidd-dtail)>0)?dmidd:((dmidd-dhead)*(dhead-dtail)>0?dhead:dtail);
-    while(phead<ptail)
+    for(ptr=head;ptr<=tail;++ptr){
+        if(data[index[ptr]]==pivot){
+            swap=index[phead];index[phead]=index[ptr];index[ptr]=swap;
+            break;
+        }
+    }
+    while(1)
     {
-        while(data[index[ptail]]>pivot && ptail>phead){ptail--;}
-        while(data[index[phead]]<pivot && phead<ptail){phead++;}
-        swap=index[phead];index[phead]=index[ptail];index[ptail]=swap;
+        while(data[index[ptail]]>=pivot && phead<ptail){ptail--;}
+        if(phead<ptail){
+            swap=index[phead];index[phead]=index[ptail];index[ptail]=swap;
+        }else{
+            break;
+        }
+        while(data[index[phead]]<=pivot && phead<ptail){phead++;}
+        if(phead<ptail){
+            swap=index[phead];index[phead]=index[ptail];index[ptail]=swap;
+        }else{
+            break;
+        }
     }
     return phead;
 }
@@ -671,7 +683,9 @@ int arcPivotSort(int head, int tail, int* index, int* data)
 int arcQuickSort(int head, int tail, int* index, int* data)
 {
     int pivot;
-    if(tail<8+head){
+    if(head>=tail){
+        return 0;
+    }else if(tail<32+head){
 	    arcSimSort(head,tail,index,data);
 	    return 0;
     }
