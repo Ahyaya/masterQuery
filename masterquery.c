@@ -75,6 +75,8 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 struct commonDataPack
 {
     struct valveServInfo *pserver;
+    int length;
+    int section;
 } commonData4thread;
 
 struct masterqueryGlobalVar_t
@@ -95,10 +97,8 @@ int fscanIp2srvList(FILE *fp, struct valveServList *pservList);
 
 int DNSquery (char* hostname);
 int A2S_INFO (struct valveServInfo *pserver);
-
-void * query_thread();
-int queryList_mt(struct valveServList *pservList, int thread_n);
-
+void *query_worker();
+int queryList_mtworker(struct valveServList *pservList, int threads);
 int arcSimSort(int head, int tail, int* index, int* data);
 int arcBinSort(int head, int tail, int index[], int data[]);
 int arcPivotSort(int head, int tail, int* index, int* data);
@@ -357,7 +357,7 @@ int A2S_INFO (struct valveServInfo *pserver) {
     close(sockfd);
     return 0;
 }
-
+/* discard code
 void * query_thread(){
     struct valveServInfo *pserver;
     pthread_mutex_lock(&mutex);
@@ -369,6 +369,7 @@ void * query_thread(){
     }
     return 0;
 }
+*/
 
 /*single thread implementation*/
 int queryList_st(struct valveServList *pservList){
@@ -387,7 +388,7 @@ int queryList_st(struct valveServList *pservList){
     }
     return 0;
 }
-
+/* discard code
 int queryList_mt(struct valveServList *pservList, int thread_n){
     pthread_t query_pid[16];
     int pf=0, p, th_s=0, indexLen=pservList[0].length;
@@ -403,19 +404,63 @@ int queryList_mt(struct valveServList *pservList, int thread_n){
             ++pf;
             usleep(50000);
         }
-        /*Wait4Join*/
         for(p=0;p<th_s;p++){
             pthread_join(query_pid[p],NULL);
         }
     }
-    /*Count for survive servers and total players*/
     for(pf=0;pf<indexLen;pf++){
         if(!pservList[0].server[pf].status){
             pservList[0].survive++;
             pservList[0].allplayers+=pservList[0].server[pf].players;     
         }
     }
-    
+    return 0;
+}
+*/
+
+void * query_worker(){
+    struct valveServInfo *pserver;
+    int section=-1, length = commonData4thread.length;
+    while(section<length-1){
+        pthread_mutex_lock(&mutex);
+        section = (commonData4thread.section)++;
+        pthread_mutex_unlock(&mutex);
+        if(section>=length){
+            return 0x00;
+        }
+        pserver=&(commonData4thread.pserver[section]);
+        A2S_INFO(pserver);
+        if(masterGlobalVar.opt_verbose){
+            fprintf(stdout,"%s:%d    status: %d\n",pserver->ipv4,pserver->port,pserver->status);
+        }
+    }
+    return 0x00;
+}
+
+int queryList_mtworker(struct valveServList *pservList, int threads){
+    pthread_t query_pid[16];
+    int ptr=0, length=pservList->length;
+    commonData4thread.pserver = &(pservList->server[0]);
+    commonData4thread.length=pservList->length;
+    commonData4thread.section=0;
+    for(ptr=0;ptr<threads;++ptr){
+        while(pthread_create(query_pid+ptr, NULL, query_worker, NULL)){
+            if(masterGlobalVar.opt_logon){
+                fprintf(stderr,"worker start failed, retrying.\n");
+            }
+            usleep(50000);
+        }
+    }
+    for(ptr=0;ptr<threads;++ptr){
+        pthread_join(query_pid[ptr],NULL);
+    }
+    /*Count for survive servers and total players*/
+    for(ptr=0;ptr<length;++ptr){
+        if(!pservList->server[ptr].status){
+            (pservList->survive)++;
+            (pservList->allplayers)+=(pservList->server[ptr].players);     
+        }
+    }
     return 0;
 }
 
@@ -581,7 +626,7 @@ int fprintHTML_header_default(FILE *fp) {
     fprintf(fp,"<h2 id=\"title\">Anne Happy Group Server List</h2><br />\n");
     fprintf(fp,"<p class=\"date\" id=\"timeStamp\"></p><br />\n");
     fprintf(fp,"<div class=\"summary\">(<span id=\"jamhostCt\"></span>) servers up: <span id=\"serversOn\">0</span>players in-game: <span id=\"playersOn\">0</span></div>\n");
-    fprintf(fp,"<div class=\"tips\">\n\t<div class=\"tips_head\"><span class=\"tips_head_wd\">Your favorite server not found?</span></div>\n<ul class=\"tips_hint\">\n<li>You may leave a comment in the <a href=\"https://arxiv.cloud/\">home page</a> to tell us the server's IP:port. We'll check and add it to the query list later.</li><li>The malfunction servers will not display in the list. Often, they're just under DDoS attack.</li>\n</ul></div>\n");
+    fprintf(fp,"<div class=\"tips\">\n\t<div class=\"tips_head\"><span class=\"tips_head_wd\">Your favorite server not found?</span></div>\n<ul class=\"tips_hint\">\n<li>You may leave a comment in the <a href=\"https://zoo-404.cn/\">home page</a> to tell us the server's IP:port. We'll check and add it to the query list later.</li><li>The malfunction servers will not display in the list. Often, they're just under DDoS attack.</li>\n</ul></div>\n");
 	fprintf(fp,"<span id=\"dblclickInfo\" onclick=\"document.getElementById(\'dblclickInfo\').innerHTML=\'\';\"></span>\n<script>\n\tfunction cpIp2Clip(ip){\n\t\tnavigator.clipboard.writeText(ip);\n\t\tdocument.getElementById(\'dblclickInfo\').innerHTML=ip+\' is copied to clipboard\';\n}\n</script>\n");
     return 0;
 }
@@ -710,7 +755,7 @@ int arcQuickSort(int head, int tail, int* index, int* data)
 }
 
 int version_print(char *pName){
-    fprintf(stdout,"%s --1.0.1\nearly version\n",pName);
+    fprintf(stdout,"%s --1.0.2\n Worker\n",pName);
     return 0;
 }
 
@@ -831,7 +876,7 @@ int main(int argc, char * argv[])
     if(masterGlobalVar.opt_verbose){
         fprintf(stdout,"Querying...\n");
     }
-    queryList_mt(&mylist, masterGlobalVar.opt_thread);
+    queryList_mtworker(&mylist, masterGlobalVar.opt_thread);
 
 
 /*
